@@ -29,7 +29,7 @@ void setup() {
   
   //Timer1.initialize(1000000);  
   Timer1.initialize(500000); //ทดลองให้นับจากจํานวนครั้งที่ led จะติดครบ 60 ครั้งแล้วเป็น 1 นาที(60 วินาที) Timer1.initialize(500000); ตรงที่สุด
-  Timer1.attachInterrupt(blinkRed);
+  Timer1.attachInterrupt(blinkRed);//No matter which part of the program's running , if reach to 1 second excute blinkRed.
   
   OLED.display();
 }
