@@ -4,11 +4,11 @@
 #define ledPin 13
 #define buttonPin 12
 #define resetButtonpin 11
-#define debounce 50
+#define debounce 150
 
 byte lastButtonState = 1;
 int lastPress = 0;
-int counter = 0;
+int counter = 0,reset_round = 0;
 
 void setup()
 {
@@ -18,7 +18,7 @@ void setup()
   pinMode(ledPin, OUTPUT);
 
   counter = EEPROM.read(0);
-
+  reset_round = EEPROM.read(sizeof(counter));
 //  EEPROM.write(0, 0);
 }
 
@@ -33,16 +33,18 @@ void loop()
   
   if (millis() - lastPress >= debounce)
   {
+    lastPress = millis();
     //press to count
     if (red == 0 && lastButtonState == 1)
     {
       counter++;
       EEPROM.put(0, counter);
-      lastPress = millis();
+      //lastPress = millis();
       digitalWrite(ledPin, HIGH);
       lastButtonState = 0;
 
       Serial.print("Counter = ");
+      EEPROM.get(0, counter);
       Serial.println(counter);
     }
 
@@ -55,8 +57,19 @@ void loop()
     //reset section
      if (reset == 0)
     {
-      counter=0;
+      // lastPress = millis();
+       counter=0;
+       reset_round++;
+       Serial.print("reset round = ");
+       Serial.println(reset_round);
+       
        EEPROM.put(0, counter);
+       EEPROM.get(0, counter);
+       
+       EEPROM.put(sizeof(counter), reset_round);
+       EEPROM.get(sizeof(counter), reset_round);
+
+       Serial.println(sizeof(counter));
     }
   }
 
