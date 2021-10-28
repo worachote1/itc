@@ -13,7 +13,15 @@ Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 //for sound
 #define buzzer 8
 
-#define debounce 500
+#define debounce 50
+
+#define ok_button 12
+
+#define countTime_button 11
+#define alarm_button 10
+
+#define add_minute_button 9
+#define add_hour_button 8
 
 int h = 12 ;
 int m  = 56;
@@ -28,9 +36,13 @@ void setup() {
   Timer1.initialize(1000000);
   Timer1.attachInterrupt(timePass);
 
-  pinMode(10, INPUT_PULLUP);
-  pinMode(11, INPUT_PULLUP);
-  pinMode(12, INPUT_PULLUP);
+
+  pinMode(ok_button, INPUT_PULLUP);
+  pinMode(countTime_button, INPUT_PULLUP);
+  pinMode(alarm_button, INPUT_PULLUP);
+  pinMode(add_minute_button, INPUT_PULLUP);
+  pinMode(add_hour_button, INPUT_PULLUP);
+
   h = EEPROM.read(0);
   m = EEPROM.read(sizeof(h));
   s = EEPROM.read(sizeof(m) * 2);
@@ -39,17 +51,102 @@ void setup() {
   OLED.display();
 }
 
-int a, b, c;
+int ok, countTime, alarm, minute, hour;//button variable
 int lastPress = 0;
+
+int alarm_h = 0     , alarm_m = 0;
+int countTime_m = 0 , countTime_s = 0;
+
+String alarm_state = "OFF" , countTime_state = "OFF";
+
 void loop() {
-  //OLED.clearDisplay();
-  OLED.setCursor(24, 14);
-  OLED.setTextColor(WHITE);
-  OLED.setTextSize(2);
+  OLED.clearDisplay();
 
+  ok = digitalRead(ok_button);
+  countTime = digitalRead(countTime_button);
+  alarm = digitalRead(alarm_button);
+  minute = digitalRead(add_minute_button);
+  hour = digitalRead(add_hour_button);
 
+  if (millis() - lastPress >= debounce )
+  {
+    lastPress = millis();
+    if (hour == 0)
+    {
+      Serial.println("hour");
+      if (alarm_state == "ON") // if there any press on this button while alarm_state == "ON" --> alarm_h ++
+      {
+        alarm_h += 1 ;
+      }
+    }
+    else if (minute == 0)
+    {
+      Serial.println("minute");
+      if (alarm_state == "ON") // if there any press on this button while alarm_state == "ON" --> alarm_m ++
+      {
+        alarm_m += 1 ;
+      }
+    }
 
+    else if (countTime == 0)
+    {
+      if (countTime_state == "OFF")
+      {
+        Serial.println("CountTime now Turn ON ");
+        countTime_state = "ON";
+      }
+      else  // countTime_state == "ON"
+      {
+        Serial.println("CountTime now Turn OFF ");
+        countTime_m = 0 ;
+        countTime_s = 0;
+        countTime_state = "OFF";
+      }
+    }
+    else if (alarm == 0)
+    {
+      if (alarm_state == "OFF")
+      {
+        Serial.println("Alarm now Turn ON ");
+        alarm_state = "ON";
+      }
+//      else // alarm_state == "ON"
+//      {
+//        Serial.println("alarm now Turn OFF ");
+//      }
+    }
 
+    else if (ok == 0)
+    {
+      Serial.println("ok");
+      Serial.println("Alarm now Turn OFF ");
+      alarm_state = "OFF";
+    }
+
+  }
+
+  // Display Section
+  // display normal mode ,if not press countTime_button or alarm_button
+  if (alarm_state == "OFF" && countTime_state == "OFF")
+  {
+    display_normal();
+  }
+
+  //display countTime mode , if countTime_button has been pressed
+  else if (countTime_state == "ON")
+  {
+    Serial.println("run display_countTime");
+    display_countTime();
+  }
+
+  //display alarm mode , if alarm_button has been pressed
+  else if (alarm_state == "ON")
+  {
+    Serial.println("run display_alarm ");
+    display_alarm();
+  }
+
+  //save to EEPROM
   EEPROM.put(0, h);
   EEPROM.get(0, h);
 
@@ -62,15 +159,12 @@ void loop() {
   OLED.display();
 }
 
-void timePass()
+void display_normal()  //normal mode function
 {
-  OLED.clearDisplay();
-  s += 1;
- 
-  if (h == 24)
-  {
-    h = 0;
-  }
+  //Normal Mode display section
+  OLED.setCursor(24, 14);
+  OLED.setTextColor(WHITE);
+  OLED.setTextSize(2);
   if (h < 10)
   {
     OLED.print("0");
@@ -78,11 +172,6 @@ void timePass()
   OLED.print(h);
   OLED.print(":");
 
-  if (m == 60)
-  {
-    h++;
-    m = 0;
-  }
   if (m < 10)
   {
     OLED.print("0");
@@ -91,15 +180,92 @@ void timePass()
   OLED.print(m);
   OLED.print(":");
 
-  if (s == 60)
-  {
-    m++;
-    s = 0;
-  }
   if (s < 10)
   {
     OLED.print("0");
   }
-
   OLED.print(s);
+}
+
+int countTime_pass = 0;
+void display_countTime() // countTime mode function
+{
+  //CountTime Mode display section
+  OLED.setCursor(28, 14);
+  OLED.setTextColor(WHITE);
+  OLED.setTextSize(2);
+
+  if (countTime_m < 10)
+  {
+    OLED.print("0");
+  }
+
+  OLED.print(countTime_m);
+  OLED.print(":");
+
+  if (countTime_s < 10)
+  {
+    OLED.print("0");
+  }
+  if (countTime_s >= 60)
+  {
+    countTime_m += 1;
+    countTime_s = 0;
+  }
+  OLED.print(countTime_s);
+
+  // countTime_s += 1; put this line of code in timePass instead , because of Timer1.attachInterrupt(timePass);
+}
+
+void display_alarm()      // Alarm mode function
+{
+  //Alarm Mode display section
+  OLED.setCursor(28, 14);
+  OLED.setTextColor(WHITE);
+  OLED.setTextSize(2);
+  if (alarm_h < 10)
+  {
+    OLED.print("0");
+  }
+  OLED.print(alarm_h);
+  OLED.print(":");
+
+  if (alarm_m < 10)
+  {
+    OLED.print("0");
+  }
+  OLED.print(alarm_m);
+}
+
+void timePass()
+{
+  //OLED.clearDisplay();
+  s += 1;
+
+  if (h == 24)
+  {
+    h = 0;
+  }
+  if (m >= 60)
+  {
+    h++;
+    m = 0;
+  }
+  if (s >= 60)
+  {
+    m++;
+    s = 0;
+  }
+
+  if (countTime_state == "ON") //add each 1 second in CountTime Mode
+  {
+    countTime_s += 1;
+  }
+
+  if ( h == alarm_h && m == alarm_m ) // wake up , get to work !!!
+  {
+    alarm_h = 0;
+    alarm_m = 0;
+    Serial.println("Alarm sucess !!!");
+  }
 }
