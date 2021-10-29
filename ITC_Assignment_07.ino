@@ -11,7 +11,7 @@ Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #include <TimerOne.h>
 
 //for sound
-#define buzzer 8
+#define buzzer 2
 
 #define debounce 50
 
@@ -22,6 +22,7 @@ Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define add_minute_button 9
 #define add_hour_button 8
+//void soundHitWall();
 
 int h = 12 ;
 int m  = 56;
@@ -43,6 +44,8 @@ void setup() {
   pinMode(add_minute_button, INPUT_PULLUP);
   pinMode(add_hour_button, INPUT_PULLUP);
 
+  pinMode(buzzer,OUTPUT);
+
   h = EEPROM.read(0);
   m = EEPROM.read(sizeof(h));
   s = EEPROM.read(sizeof(m) * 2);
@@ -58,6 +61,7 @@ int alarm_h = 0     , alarm_m = 0;
 int countTime_m = 0 , countTime_s = 0;
 
 String alarm_state = "OFF" , countTime_state = "OFF";
+String sound_state = "OFF";
 
 void loop() {
   OLED.clearDisplay();
@@ -77,6 +81,12 @@ void loop() {
       if (alarm_state == "ON") // if there any press on this button while alarm_state == "ON" --> alarm_h ++
       {
         alarm_h += 1 ;
+        if(alarm_h > 23)
+        {
+          alarm_h = 0;
+        }
+        
+        sound_add_time();
       }
     }
     else if (minute == 0)
@@ -85,6 +95,13 @@ void loop() {
       if (alarm_state == "ON") // if there any press on this button while alarm_state == "ON" --> alarm_m ++
       {
         alarm_m += 1 ;
+        if(alarm_m >= 60)
+        {
+          alarm_h += 1;
+          alarm_m = 0;
+        }
+        
+        sound_add_time();
       }
     }
 
@@ -121,11 +138,13 @@ void loop() {
       Serial.println("ok");
       Serial.println("Alarm now Turn OFF ");
       alarm_state = "OFF";
+      sound_state = "OFF";
     }
 
   }
 
   // Display Section
+  
   // display normal mode ,if not press countTime_button or alarm_button
   if (alarm_state == "OFF" && countTime_state == "OFF")
   {
@@ -146,6 +165,12 @@ void loop() {
     display_alarm();
   }
 
+  //check if sound should be played ?
+  if(sound_state == "ON")
+  {
+    sound_alarm();                                    //-----------------------------------
+  }
+
   //save to EEPROM
   EEPROM.put(0, h);
   EEPROM.get(0, h);
@@ -156,6 +181,7 @@ void loop() {
   EEPROM.put(sizeof(m) * 2, s);
   EEPROM.get(sizeof(m) * 2, s);
 
+  
   OLED.display();
 }
 
@@ -227,6 +253,7 @@ void display_alarm()      // Alarm mode function
   {
     OLED.print("0");
   }
+
   OLED.print(alarm_h);
   OLED.print(":");
 
@@ -234,8 +261,23 @@ void display_alarm()      // Alarm mode function
   {
     OLED.print("0");
   }
+ 
   OLED.print(alarm_m);
 }
+
+//play sound function
+
+// play sound when alarm end (will be use when sound_state == "ON")
+void sound_alarm(){
+  tone(buzzer, 500, 50);
+  Serial.println("play sound alarm");
+ }
+//play sound when minute or hour button pressed
+void sound_add_time()
+{
+  tone( buzzer, 250, 50);
+  Serial.println("play sound add time");
+} 
 
 void timePass()
 {
@@ -266,6 +308,7 @@ void timePass()
   {
     alarm_h = 0;
     alarm_m = 0;
+    sound_state = "ON";
     Serial.println("Alarm sucess !!!");
   }
 }
