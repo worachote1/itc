@@ -22,10 +22,13 @@ Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define add_minute_button 9
 #define add_hour_button 8
-//void soundHitWall();
 
-int h = 12 ;
-int m  = 56;
+//for working with Dark Mode , Light Mode using LDR module
+#define ldr A0
+
+
+int h = 1 ;
+int m  = 0;
 int s = 4;
 void setup() {
   OLED.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -38,14 +41,16 @@ void setup() {
   Timer1.attachInterrupt(timePass);
 
 
+  //
   pinMode(ok_button, INPUT_PULLUP);
   pinMode(countTime_button, INPUT_PULLUP);
   pinMode(alarm_button, INPUT_PULLUP);
   pinMode(add_minute_button, INPUT_PULLUP);
   pinMode(add_hour_button, INPUT_PULLUP);
 
+  //sound
   pinMode(buzzer,OUTPUT);
-
+  
   h = EEPROM.read(0);
   m = EEPROM.read(sizeof(h));
   s = EEPROM.read(sizeof(m) * 2);
@@ -63,15 +68,34 @@ int countTime_m = 0 , countTime_s = 0;
 String alarm_state = "OFF" , countTime_state = "OFF";
 String sound_state = "OFF";
 
+//resistor value inverse with lux
+//more light less R , less light more R
+int resistor_value ;
+
 void loop() {
   OLED.clearDisplay();
 
+  // button variable
   ok = digitalRead(ok_button);
   countTime = digitalRead(countTime_button);
   alarm = digitalRead(alarm_button);
   minute = digitalRead(add_minute_button);
   hour = digitalRead(add_hour_button);
 
+  // LDR variable
+  resistor_value = analogRead(ldr);
+  Serial.println(resistor_value);
+
+  //select Dark Mode or Light Mode depend on lux_value
+  if(resistor_value >= 440)
+  {
+    display_light_mode();
+  }
+  else
+  {
+    display_dark_mode();  
+  }
+  
   if (millis() - lastPress >= debounce )
   {
     lastPress = millis();
@@ -134,7 +158,8 @@ void loop() {
     }
 
     else if (ok == 0)
-    {
+    { 
+      ok_saveTime();
       Serial.println("ok");
       Serial.println("Alarm now Turn OFF ");
       alarm_state = "OFF";
@@ -171,6 +196,23 @@ void loop() {
     sound_alarm();                                    //-----------------------------------
   }
 
+//  //save to EEPROM
+//  EEPROM.put(0, h);
+//  EEPROM.get(0, h);
+//
+//  EEPROM.put(sizeof(h), m);
+//  EEPROM.get(sizeof(h), m);
+//
+//  EEPROM.put(sizeof(m) * 2, s);
+//  EEPROM.get(sizeof(m) * 2, s);
+
+  
+  OLED.display();
+}
+
+//save time , if ok button pressed
+void ok_saveTime()
+{
   //save to EEPROM
   EEPROM.put(0, h);
   EEPROM.get(0, h);
@@ -180,17 +222,27 @@ void loop() {
 
   EEPROM.put(sizeof(m) * 2, s);
   EEPROM.get(sizeof(m) * 2, s);
+}
 
-  
-  OLED.display();
+//Dark Mode and Light Mode
+void display_dark_mode()
+{
+  OLED.setTextColor(WHITE);
+  OLED.setTextSize(2);
+}
+void display_light_mode()
+{
+  OLED.fillScreen(WHITE);
+  OLED.setTextColor(BLACK);
+  OLED.setTextSize(2);
 }
 
 void display_normal()  //normal mode function
 {
   //Normal Mode display section
   OLED.setCursor(24, 14);
-  OLED.setTextColor(WHITE);
-  OLED.setTextSize(2);
+//  OLED.setTextColor(WHITE);
+//  OLED.setTextSize(2);
   if (h < 10)
   {
     OLED.print("0");
@@ -218,8 +270,8 @@ void display_countTime() // countTime mode function
 {
   //CountTime Mode display section
   OLED.setCursor(28, 14);
-  OLED.setTextColor(WHITE);
-  OLED.setTextSize(2);
+//  OLED.setTextColor(WHITE);
+//  OLED.setTextSize(2);
 
   if (countTime_m < 10)
   {
@@ -247,8 +299,8 @@ void display_alarm()      // Alarm mode function
 {
   //Alarm Mode display section
   OLED.setCursor(28, 14);
-  OLED.setTextColor(WHITE);
-  OLED.setTextSize(2);
+//  OLED.setTextColor(WHITE);
+//  OLED.setTextSize(2);
   if (alarm_h < 10)
   {
     OLED.print("0");
