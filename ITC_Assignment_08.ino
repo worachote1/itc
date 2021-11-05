@@ -1,133 +1,151 @@
 #include <Arduino_FreeRTOS.h>
+#include "queue.h"
 
-#define RED     6
-#define YELLOW  7
-#define GREEN    8
+#define RED     6 //8
+#define YELLOW  7 //9
+#define GREEN   8 //10
 
-#define debounce 50
+#define SW1     12 //5  //control red
+#define SW2     11 //6  //control yellow
+#define SW3     10 //7  //control green
 
-#define button_R  12
-#define button_Y  11
-#define button_G  10
+QueueHandle_t BlinkQueue;
 
-int lastPress = 0;
-int r, g, y;
 void setup()
 {
   Serial.begin(9600);
+  BlinkQueue =  xQueueCreate(10, sizeof(int32_t));
 
-  pinMode(button_R, INPUT_PULLUP);
-  pinMode(button_Y, INPUT_PULLUP);
-  //  pinMode(button_G, INPUT_PULLUP);
+  xTaskCreate(vSenderTask, "Sender Task 1", 100, SW1, 1, NULL);
+  xTaskCreate(vSenderTask, "Sender Task 1", 100, SW2, 1, NULL);
+  xTaskCreate(vSenderTask, "Sender Task 1", 100, SW3, 1, NULL);
 
-  xTaskCreate(redLedControllerTask, "RED LED Task", 128, NULL, 1, NULL);
-  xTaskCreate(greenLedControllerTask, "BLUE LED Task", 128, NULL, 1, NULL);
-  xTaskCreate(yellowLedControllerTask, "YELLOW LED Task", 128, NULL, 1 , NULL);
-
+  xTaskCreate(vReceiverTask, "Receiver Task ", 100, RED, 1, NULL);
+  xTaskCreate(vReceiverTask, "Receiver Task", 100, YELLOW, 1, NULL);
+  xTaskCreate(vReceiverTask, "Receiver Task", 100, GREEN, 1, NULL);
 }
 
-//เมื่อกด button_R ให้ LED นี้ติดเป็นเวลา 3 วินาทีแล้วดับ ถ้ากดซํ้าระหว่างที่ติดให้นับเวลาจากที่กดไปอีก 3 วินาที
-//(เช่น กดไปแล้ว 2 วิ อีกวินึงมันจะหมดถูกมะ แล้วเรากดอีกรอบพอดีก็ +3 ติดให้ครบ 6 วิ)
-void redLedControllerTask(void *pvParameters)
+int lastPress = 0;
+void vSenderTask(void *pvParameters)
 {
-  pinMode(RED, OUTPUT);
-  String r_state = "OFF";
-
+  BaseType_t qStatus;
+  int32_t valueToSend = 0;
+  int SW = (int32_t)pvParameters;
+  const TickType_t xTicksToWait = pdMS_TO_TICKS(100);
+  pinMode(SW, INPUT_PULLUP);
   while (1)
   {
-    r = digitalRead(button_R);
 
-
-  }
-}
-//จะอ่านสถานะของ LED (ใช้คำสั่ง digitalRead) จากนั้นนำมา xor (ในภาษา C การทำ xor จะใช้เครื่องหมาย ^) กับ 1 ทำให้เมื่ออ่านได้ 1 จะกลายเป็น 0
-//และหากอ่านได้ 0 จะกลายเป็น 1 ทำให้เมื่อเขียนกลับไปที่ LED ผ่านคำสั่ง digitalWrite
-//จะทำให้กลับสถานะ คือ จาก 0 ก็จะเขียนกลับเป็น 1 และจาก 1 ก็จะเขียนกลับเป็น 0 ซึ่งก็คือไฟกระพริบนั่นเอง
-
-
-//เมื่อกด button_Y ให้ LED นี้ติดและกระพริบไปเรื่อยๆ จนกว่าจะกด button_Y อีกคร้ง
-
-void yellowLedControllerTask(void *pvParameters)
-{
-  pinMode(YELLOW, OUTPUT);
-  pinMode(button_Y, INPUT_PULLUP);
-  String y_state = "OFF";
-  while (1)
-  {
-    y = digitalRead(button_Y);
- 
-    
-    if (y == 0 && millis() - lastPress >= debounce)
+    if (digitalRead(SW) == LOW && millis() - lastPress >= 50)
     {
       lastPress = millis();
-      if (y_state == "OFF")
-      {
-        y_state = "ON";
-      }
-      else if (y_state == "ON")
-      {
-        y_state = "OFF";
-      }
+      valueToSend = SW;
     }
-    
-     if (y_state == "ON")
+    else
     {
-     // delay(500);
-      digitalWrite(YELLOW, digitalRead(YELLOW) ^ 1);
-    }
-    else if(y_state == "OFF")
-    {
-      digitalWrite(YELLOW, HIGH); // turn off LED (this is active LOW , LED will turn on when LOW)
+      valueToSend = 0;
     }
 
-    Serial.print("y_state = ");
-    Serial.println(y_state);
+    if (valueToSend != 0) //ทําเงื่อนไขเมื่อ valueToSend != 0
+    {
+      qStatus = xQueueSend(BlinkQueue, &valueToSend, xTicksToWait);
+      vTaskDelay(10); //10
+    }
   }
 }
 
-//กด button_G แล้ให้ LED นี้กระพริบ 3 ครั้งครั้งละ 500 ms ถ้ากดซํ้าไม่มีผล(ต้องกระพริบให้ครบถึงกดใหม่ได้)
-void  greenLedControllerTask(void *pvParameters)
+int count_red = 0;
+unsigned long  pastTime_red = 0;
+void vReceiverTask(void *pvParameters)
 {
-  pinMode(GREEN, OUTPUT);
-  pinMode(button_G, INPUT_PULLUP);
-  String g_state = "OFF";
+  int time_red = 0;
+  int LED = (int32_t)pvParameters;
+  int32_t valueReceived;
+  BaseType_t qStatus;
+  const TickType_t xTicksToWait = pdMS_TO_TICKS(100);
+
+  //these LED are active LOW (LED active when LOW)
+  pinMode(RED, OUTPUT); digitalWrite(RED, HIGH);
+  pinMode(YELLOW, OUTPUT); digitalWrite(YELLOW, HIGH);
+  pinMode(GREEN, OUTPUT); digitalWrite(GREEN, HIGH);
+
+  bool YELLOW_status = false;
   while (1)
   {
-
-    digitalWrite(GREEN, HIGH); //led light when LOW (active LOW)
-    g = digitalRead(button_G);
-    if (g == 0 && millis() - lastPress >= debounce)
+    qStatus = xQueueReceive(BlinkQueue, &valueReceived, xTicksToWait);
+    if (qStatus  == pdPASS)
     {
-      lastPress = millis();
-      if (g_state == "OFF")
+      Serial.println(valueReceived);
+      if (valueReceived == 12 && LED == RED)
       {
-        g_state = "ON";
+        Serial.print("LED = ");
+        Serial.print(LED);
+        Serial.print("valueReceived = ");
+        Serial.println(valueReceived);
+
+        count_red += 1;
+        //time_red = count_red * 3000;
+        digitalWrite(RED, LOW);
+//        vTaskDelay(300); 
+//       
+//        digitalWrite(RED, 1);
       }
-      else if (g_state == "ON")
+      else if (valueReceived == 11 && LED == YELLOW)
       {
-        g_state = "OFF";
+        YELLOW_status = !(YELLOW_status);
+      }
+      else if (valueReceived == 10 && LED == GREEN)
+      {
+        Serial.print("LED = ");
+        Serial.println(LED);
+
+        for(int i = 1 ; i <= 3 ; i++)
+        {
+          digitalWrite(GREEN, 0);
+          vTaskDelay(50); //คล้ายๆ delay(500)
+          digitalWrite(GREEN, 1);
+          vTaskDelay(50);
+        }
+      }
+//      else if (valueReceived != 10)
+//      {
+//        int32_t valueReceived = valueReceived;
+//        xQueueReceive(BlinkQueue, &valueReceived, xTaskCreate);
+//        vTaskDelay(1);
+//      }
+    }
+
+    //how to display Yellow LED
+    if (YELLOW_status && LED == YELLOW)
+    {
+      Serial.print("LED = ");
+      Serial.println(LED);
+      digitalWrite(YELLOW, LOW);
+      vTaskDelay(20);
+      digitalWrite(YELLOW, HIGH);
+      vTaskDelay(20);
+    }
+
+    //how to do display Red LED
+    if(count_red > 0)
+    {
+      Serial.print("count = ");
+      Serial.println(count_red);
+      if( millis() - pastTime_red >= count_red * 3000)
+      {
+        pastTime_red = millis();
+        digitalWrite(RED,HIGH); // turn off red LED
+        count_red = 0;    
+//        Serial.print("finally , count = ");
+//        Serial.println(count_red); 
       }
     }
 
-    if (g_state == "ON")
-    {
-      for (int i = 1 ; i <= 3 ; i++)
-      {
-        //        digitalWrite(GREEN, HIGH);
-        //        delay(500);
-        //        digitalWrite(GREEN, LOW);
-        //        delay(500);
-
-        digitalWrite(GREEN, digitalRead(GREEN) ^ 1);
-        delay(500);
-        digitalWrite(GREEN, digitalRead(GREEN) ^ 1);
-        delay(500);
-      }
-      g_state = "OFF";
-    }
-
-
+   
   }
+  
+}
+void loop() {}
 }
 
 void loop()
