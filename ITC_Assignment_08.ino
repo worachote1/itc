@@ -54,8 +54,13 @@ void vSenderTask(void *pvParameters)
   }
 }
 
+//for control time with red LED
 int count_red = 0;
 unsigned long  pastTime_red = 0;
+
+//for control time with yellow LED
+unsigned long  pastTime_yellow = 0;
+
 void vReceiverTask(void *pvParameters)
 {
   int time_red = 0;
@@ -93,6 +98,7 @@ void vReceiverTask(void *pvParameters)
       else if (valueReceived == 11 && LED == YELLOW)
       {
         YELLOW_status = !(YELLOW_status);
+        digitalWrite(YELLOW,HIGH);
       }
       else if (valueReceived == 10 && LED == GREEN)
       {
@@ -113,17 +119,20 @@ void vReceiverTask(void *pvParameters)
 //        xQueueReceive(BlinkQueue, &valueReceived, xTaskCreate);
 //        vTaskDelay(1);
 //      }
+
+      //test
+      Serial.print("qStatus = ");
+      Serial.println(qStatus );
     }
 
     //how to display Yellow LED
     if (YELLOW_status && LED == YELLOW)
     {
-      Serial.print("LED = ");
-      Serial.println(LED);
-      digitalWrite(YELLOW, LOW);
-      vTaskDelay(20);
-      digitalWrite(YELLOW, HIGH);
-      vTaskDelay(20);
+        if(millis() - pastTime_yellow >= 400 )
+        {
+          pastTime_yellow = millis();
+          digitalWrite(YELLOW,digitalRead(YELLOW) ^ 1);
+        }         
     }
 
     //how to do display Red LED
@@ -144,8 +153,6 @@ void vReceiverTask(void *pvParameters)
    
   }
   
-}
-void loop() {}
 }
 
 void loop()
