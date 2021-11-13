@@ -15,6 +15,14 @@
 SemaphoreHandle_t redMutex, greenMutex;
 QueueHandle_t redQueue, yellowQueue, greenQueue;
 
+//Semaphore เป็นโครงสร้างข้อมูลที่สามารถเก็บสิ่งที่เรียกว่า Tokens 
+/* 
+task สามารถดึง Token ออกจาก Semaphore ได้ ถ้ายังมีเหลืออยู่ แต่ถ้าในขณะนั้นไม่มีเหลืออยู่ ทาส์กที่ต้องการจะนำ Token ออกไป (Take) 
+จะถูกเปลี่ยนสถานะจาก RUNNING เป็น BLOCKED เพื่อหยุดรอ และรอจนกว่า จะมี Token ถูกนำมาใส่กลับคืนมา (อย่างน้อยต้องมี 1) ทาส์กดังกล่าวจึงจะสามารถขอ Token ใหม่อีกครั้งได้
+*/
+
+//xSemaphoreTake() นำ Token ออกจากเซมาฟอร์
+//xSemaphoreGive() นำ Token มาใส่คืนลงในเซมาฟอร์
 void setup()
 {
   Serial.begin(9600);
