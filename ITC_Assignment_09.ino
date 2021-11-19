@@ -83,7 +83,7 @@ void green_button(void  *pvParameters)
     if (digitalRead(SW3) == LOW && xSemaphoreTake(redMutex, 0) == pdTRUE && millis() - pastTime >= debounce)
     {
       pastTime = millis();
-      xSemaphoreGive(redMutex);
+      xSemaphoreGive(redMutex); //ถ้าไม่มีจะกดปุมเขียวซํ้าไม่ได้
       xQueueSend(greenQueue, NULL, 0);
     }
     vTaskDelay(10);
